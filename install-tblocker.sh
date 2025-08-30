@@ -2,7 +2,9 @@
 
 # install_tblocker.sh
 # Автоматическая установка Tblocker и настройка Remnanode
-# GitHub-версия
+# Обновлённая версия: исправлена обработка ошибок dpkg и установка Tblocker
+# Автор: ChatGPT
+# Дата: 2025-08-30
 
 # ===== Проверка root =====
 if [ "$EUID" -ne 0 ]; then
@@ -11,6 +13,17 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 echo "✅ Запускаем установку Tblocker..."
+
+# ===== Исправление прерванного dpkg =====
+if sudo fuser /var/lib/dpkg/lock >/dev/null 2>&1; then
+    echo "❌ dpkg занят, завершите другие установки и попробуйте снова."
+    exit 1
+fi
+
+if [ -f /var/lib/dpkg/lock ]; then
+    echo "⚠ Предыдущая установка прервана. Исправляем dpkg..."
+    sudo dpkg --configure -a
+fi
 
 # ===== Удаление старого Tblocker =====
 if dpkg -l | grep -q tblocker; then
@@ -31,7 +44,7 @@ if [ ! -f "$COMPOSE_FILE" ]; then
 fi
 
 if ! grep -q "/var/log/remnanode" "$COMPOSE_FILE"; then
-    echo "➡ Добавляем volumes в docker-compose.yml..."
+    echo "Добавляем volumes в docker-compose.yml..."
     sed -i '/volumes:/a\            - '\''/var/log/remnanode:/var/log/remnanode'\''' "$COMPOSE_FILE"
 else
     echo "✅ volumes уже настроен."
@@ -73,6 +86,12 @@ bash <(curl -fsSL git.new/install) <<EOF
 1
 EOF
 
+# Проверяем, установился ли Tblocker
+if [ ! -d /opt/tblocker ]; then
+    echo "❌ Установка Tblocker не удалась. Проверьте вывод установки."
+    exit 1
+fi
+
 # ===== Ввод параметров =====
 read -p "Введите домен бота (пример: vpn-bot.site): " BOT_DOMAIN
 read -p "Введите время блокировки (в минутах): " BLOCK_DURATION
@@ -97,8 +116,9 @@ EOL
 
 # ===== Перезапуск Tblocker =====
 echo "➡ Перезапуск Tblocker..."
-systemctl stop tblocker
-systemctl start tblocker
+systemctl daemon-reload
+systemctl enable tblocker
+systemctl restart tblocker
 
 echo "✅ Установка завершена!"
 systemctl status tblocker --no-pager
