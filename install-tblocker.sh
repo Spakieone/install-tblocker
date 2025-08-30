@@ -43,11 +43,18 @@ if [ ! -f "$COMPOSE_FILE" ]; then
     exit 1
 fi
 
-if ! grep -q "/var/log/remnanode" "$COMPOSE_FILE"; then
-    echo "Добавляем volumes в docker-compose.yml..."
+# Удаляем ненужный том /var/lib/toblock
+if grep -q "/var/lib/toblock:/var/lib/toblock" "$COMPOSE_FILE"; then
+    echo "➡ Удаляем лишний том /var/lib/toblock из docker-compose.yml..."
+    sed -i '/\/var\/lib\/toblock:\/var\/lib\/toblock/d' "$COMPOSE_FILE"
+fi
+
+# Добавляем только необходимый том /var/log/remnanode
+if ! grep -q "/var/log/remnanode:/var/log/remnanode" "$COMPOSE_FILE"; then
+    echo "➡ Добавляем том /var/log/remnanode в docker-compose.yml..."
     sed -i '/volumes:/a\            - '\''/var/log/remnanode:/var/log/remnanode'\''' "$COMPOSE_FILE"
 else
-    echo "✅ volumes уже настроен."
+    echo "✅ volumes для логов уже настроен."
 fi
 
 # ===== Создание папки логов =====
